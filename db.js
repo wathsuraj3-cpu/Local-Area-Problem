@@ -1,0 +1,78 @@
+const fs = require("fs");
+const path = require("path");
+const dir = process.env.DATA_DIR || path.join(__dirname, "data");
+if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+const files = {
+  users: path.join(dir, "users.json"),
+  reports: path.join(dir, "reports.json"),
+  audit: path.join(dir, "audit_logs.json"),
+};
+function read(key) {
+  try {
+    return JSON.parse(fs.readFileSync(files[key], "utf8"));
+  } catch {
+    return [];
+  }
+}
+function write(key, value) {
+  const tmp = files[key] + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
+  fs.renameSync(tmp, files[key]);
+}
+for (const key of Object.keys(files))
+  if (!fs.existsSync(files[key])) write(key, []);
+module.exports = {
+  users: () => read("users"),
+  reports: () => read("reports"),
+  audit: () => read("audit"),
+  userByEmail: (email) =>
+    read("users").find((u) => u.email === String(email).toLowerCase()) ||
+    null,
+  addUser: (user) => {
+    const all = read("users");
+    all.push(user);
+    write("users", all);
+    return user;
+  },
+  addReport: (report) => {
+    const all = read("reports");
+    all.unshift(report);
+    write("reports", all);
+    return report;
+  },
+  updateReport: (id, changes, actor, action = "REPORT_UPDATED") => {
+    const all = read("reports");
+    const i = all.findIndex((r) => r.id === id);
+    if (i < 0) return null;
+    const before = all[i];
+    all[i] = {
+      ...before,
+      ...changes,
+      id: before.id,
+      citizenId: before.citizenId,
+      createdAt: before.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
+    write("reports", all);
+    const logs = read("audit");
+    logs.unshift({
+      id: "AUD-" + Date.now(),
+      reportId: id,
+      actor,
+      action,
+      from: before.status,
+      to: all[i].status,
+      remarks: all[i].adminRemarks,
+      at: all[i].updatedAt,
+    });
+    write("audit", logs);
+    return all[i];
+  },
+  deleteReport: (id) => {
+    const all = read("reports");
+    const next = all.filter((r) => r.id !== id);
+    if (next.length === all.length) return false;
+    write("reports", next);
+    return true;
+  },
+};

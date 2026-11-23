@@ -1,0 +1,21 @@
+# One-click deployment blueprint for https://render.com
+# Gives a public https link such as https://local-area-problem-reporter.onrender.com
+services:
+  - type: web
+    name: local-area-problem-reporter
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_NAME
+        value: Administrator
+      - key: ADMIN_EMAIL
+        sync: false        # you will be asked for this value in the Render dashboard
+      - key: ADMIN_PASSWORD
+        sync: false        # you will be asked for this value (minimum 10 characters)
